@@ -15,8 +15,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Vibrator;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -35,7 +33,6 @@ import java.util.Random;
 public class MainActivity extends AppCompatActivity {
     private EditText editText;
     private Button button;
-    private String url;
     private ImageView imageView;
     private Toast toast;
     private boolean isvideo;
@@ -62,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                url = editText.getText().toString().trim();
+               String url = editText.getText().toString().trim();
                 //checking if url contains http prefix
                 if(!url.contains("htt")){
                   url="http://"+url;
@@ -83,8 +80,6 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == 2) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 toaster("storage permission" + "was " + " granted");
-                //resume tasks needing this permission
-                downloadFile();
             }
             if (grantResults[0] == -1) {
                 toaster("storage permission" + "was " + " denied");
@@ -102,12 +97,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void downloadFile() {
+    private void downloadFile(final String url, final String extension) {
         if(isImage){
             //download image
             Picasso.get().load(url).into(new Target() {
                 @Override
-                public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
+                public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
                     saveImageToExternalStorage(bitmap);
                     findViewById(R.id.progressBar).setVisibility(View.GONE);
                     imageView.setImageBitmap(bitmap);
@@ -115,14 +110,16 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onBitmapFailed(Exception e, Drawable errorDrawable) {
-                    toaster("downloading failed :"+url);
+                    toaster("downloading failed with format :"+extension+url);
                     findViewById(R.id.progressBar).setVisibility(View.GONE);
+                    imageView.setImageDrawable(errorDrawable);
                     Picasso.get().load(url).into(imageView);
                 }
 
                 @Override
                 public void onPrepareLoad(Drawable placeHolderDrawable) {
                     findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+                    imageView.setImageDrawable(placeHolderDrawable);
                     toaster("loading...");
                 }
             });
@@ -131,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
             //download video
             Uri uri = Uri.parse(url);
             DownloadManager.Request r = new DownloadManager.Request(uri);
-            r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS+"/Assignment/videos", fileName);
             r.allowScanningByMediaScanner();
             r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
@@ -144,6 +141,9 @@ public class MainActivity extends AppCompatActivity {
                 toaster("downloading failed :"+e.getMessage());
             }
         }
+        isvideo=false;
+        isImage=false;
+        editText.setText("");
     }
     private boolean isWriteStoragePermissionGranted() {
         if (Build.VERSION.SDK_INT >= 23) {
@@ -178,14 +178,14 @@ public class MainActivity extends AppCompatActivity {
                 case ".gif":
                     isImage=true;
                     toaster("image file found");
-                    downloadFile();
+                    downloadFile(url,extension);
                     break;
                 case ".mp4":
                 case ".avi":
                 case ".3gp":
                     isvideo=true;
                     toaster("video file found");
-                    downloadFile();
+                    downloadFile(url, extension);
                     break;
                 default:
                     toaster("invalid link: "+url+extension);
@@ -201,8 +201,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveImageToExternalStorage(Bitmap finalBitmap) {
-        String root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString();
-        File myDir = new File(root + "/saved_images");
+        String root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString();
+        File myDir = new File(root +"/Assignment/images");
         myDir.mkdirs();
         Random generator = new Random();
         int n = 10000;
@@ -219,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
             finalBitmap.compress(Bitmap.CompressFormat.JPEG, 94, out);
             out.flush();
             out.close();
-        toaster("file saved in Pictures/saved_images : "+fname.trim());
+        toaster("file saved in Downloads/Assignment: "+fname.trim());
         vibrator.vibrate(400);
         }
         catch (Exception e) {
