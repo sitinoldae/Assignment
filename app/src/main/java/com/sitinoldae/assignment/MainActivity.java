@@ -1,10 +1,9 @@
 package com.sitinoldae.assignment;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -22,6 +21,10 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
+import com.squareup.picasso.MemoryPolicy;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 
@@ -32,7 +35,8 @@ import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
     private EditText editText;
-    private Button button;
+    private AlertDialog progressDialog;
+    private Button button,button2;
     private ImageView imageView;
     private Toast toast;
     private boolean isvideo;
@@ -44,11 +48,30 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         editText= findViewById(R.id.editText);
-        button= findViewById(R.id.button);
+        button= findViewById(R.id.button2);
+        button2= findViewById(R.id.button);
         imageView= findViewById(R.id.imageView);
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        progressDialog = new AlertDialog.Builder(MainActivity.this).create();
+        progressDialog.setTitle("Please wait");
+        progressDialog.setMessage("The image is being downloaded !");
+
         toast=Toast.makeText(getApplicationContext(),"null",Toast.LENGTH_SHORT);
         //adding listeners
+        button2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                try {
+                    String textToPaste = (String) clipboard.getPrimaryClip().getItemAt(0).getText();
+                    editText.setText(textToPaste);
+                } catch (Exception e) {
+                    toaster(e.getMessage());
+                    return;
+                }
+                //paste data from clipboard
+            }
+        });
         button.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View view) {
@@ -92,35 +115,39 @@ public class MainActivity extends AppCompatActivity {
         if(editText.getText().toString().matches("")){
             editText.setText("");
             fileName="";
-        }else{
-            recreate();
         }
+        if(progressDialog.isShowing())
+            progressDialog.dismiss();
     }
 
-    private void downloadFile(final String url, final String extension) {
+    private void downloadFile( String url, final String extension) {
+        final String currentURL=url;
         if(isImage){
             //download image
-            Picasso.get().load(url).into(new Target() {
+            Picasso.get()
+                    .load(url)
+                    .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
+                    .into(new Target() {
                 @Override
-                public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
+                public void onBitmapLoaded( Bitmap bitmap, Picasso.LoadedFrom from) {
                     saveImageToExternalStorage(bitmap);
-                    findViewById(R.id.progressBar).setVisibility(View.GONE);
                     imageView.setImageBitmap(bitmap);
+                    progressDialog.dismiss();
                 }
 
                 @Override
                 public void onBitmapFailed(Exception e, Drawable errorDrawable) {
-                    toaster("downloading failed with format :"+extension+url);
-                    findViewById(R.id.progressBar).setVisibility(View.GONE);
+                    toaster("downloading failed with format :"+extension+currentURL);
                     imageView.setImageDrawable(errorDrawable);
-                    Picasso.get().load(url).into(imageView);
+                    Picasso.get().load(currentURL).into(imageView);
+                    progressDialog.dismiss();
                 }
 
                 @Override
                 public void onPrepareLoad(Drawable placeHolderDrawable) {
-                    findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
                     imageView.setImageDrawable(placeHolderDrawable);
                     toaster("loading...");
+                    progressDialog.show();
                 }
             });
         }
